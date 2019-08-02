@@ -268,7 +268,16 @@ namespace TheArtOfDev.HtmlRenderer.Core.Dom
                                 {
                                     if (colcount == realcol)
                                     {
-                                        rows[i].Boxes.Insert(colcount, new CssSpacingBox(_tableBox, ref cell, currow));
+                                        // Philipp@inbox.ru 2019.08.02
+                                        // if colspan more than one - add count of colspan
+                                        // Fix errors with colspan and rowspan at the same time
+                                        int insert_colspan = GetColSpan(cell);
+
+                                        for (int ic = 0; ic < insert_colspan; ic++)
+                                        {
+                                            rows[i].Boxes.Insert(colcount, new CssSpacingBox(_tableBox, ref cell, currow));
+                                        }
+
                                         break;
                                     }
                                     colcount++;
