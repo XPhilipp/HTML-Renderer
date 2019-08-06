@@ -251,42 +251,90 @@ namespace TheArtOfDev.HtmlRenderer.Core.Dom
                 int currow = 0;
                 List<CssBox> rows = _bodyrows;
 
+                List<SortedList<int, CssSpacingBox>> insertes = null;
+
                 foreach (CssBox row in rows)
                 {
                     for (int k = 0; k < row.Boxes.Count; k++)
                     {
                         CssBox cell = row.Boxes[k];
+
+                        string attr = cell.GetAttribute("id");
+                        if (!string.IsNullOrEmpty(attr))
+                        {
+                            int jk = 0;
+                        }
+
                         int rowspan = GetRowSpan(cell);
                         int realcol = GetCellRealColumnIndex(row, cell); //Real column of the cell
+                        // Philipp@inbox.ru 2019.08.02-06
+                        // change logic of rowspan and colspan calculating
+                        int colspan = GetColSpan(cell);
 
                         for (int i = currow + 1; i < currow + rowspan; i++)
                         {
                             if (rows.Count > i)
                             {
-                                int colcount = 0;
-                                for (int j = 0; j < rows[i].Boxes.Count; j++)
+                                for (int ic = 0; ic < colspan; ic++)
                                 {
-                                    if (colcount == realcol)
+                                    // impossible to know where real empty box will be, therefore use "insertes"
+                                    if (insertes == null)
                                     {
-                                        // Philipp@inbox.ru 2019.08.02
-                                        // if colspan more than one - add count of colspan
-                                        // Fix errors with colspan and rowspan at the same time
-                                        int insert_colspan = GetColSpan(cell);
-
-                                        for (int ic = 0; ic < insert_colspan; ic++)
+                                        insertes = new List<SortedList<int, CssSpacingBox>>();
+                                        for (int ii = 0; ii < rows.Count; ii++)
                                         {
-                                            rows[i].Boxes.Insert(colcount, new CssSpacingBox(_tableBox, ref cell, currow));
+                                            insertes.Add(new SortedList<int, CssSpacingBox>());
                                         }
-
-                                        break;
                                     }
-                                    colcount++;
-                                    realcol -= GetColSpan(rows[i].Boxes[j]) - 1;
+
+                                    int append_shift = 0;
+
+                                    for (int d = 0; d < insertes[currow].Count; d++)
+                                    {
+                                        if (d == insertes[currow].Keys[d])
+                                            append_shift = d + 1;
+                                        else
+                                            break;
+                                    }
+
+                                    insertes[i].Add(realcol + ic + append_shift, new CssSpacingBox(_tableBox, ref cell, currow));
                                 }
                             }
                         }
                     }
                     currow++;
+                }
+                if (insertes != null) // process insertes of empty boxex, prepared early
+                {
+                    for (int i = 0; i < rows.Count; i++)
+                    {
+                        int d_prev = 0;
+                        foreach (KeyValuePair<int, CssSpacingBox> kvp in insertes[i])
+                        {
+                            if (d_prev == (kvp.Key - 1) || kvp.Key == 0) // First empty boxex - just insert
+                            {
+                                rows[i].Boxes.Insert(kvp.Key, kvp.Value);
+                                d_prev = kvp.Key;
+                            }
+                            else
+                            {
+                                // get real index of column for inserts... check boxes
+                                int real_insert_index = kvp.Key;
+                                int min_count = rows[i].Boxes.Count < kvp.Key ? rows[i].Boxes.Count : kvp.Key;
+
+                                for (int j = 0; j < min_count; j++)
+                                {
+                                    int colspan = GetColSpan(rows[i].Boxes[j]);
+                                    real_insert_index -= colspan - 1;
+                                }
+                                // real_insert_index containt real column for empty box in table
+                                rows[i].Boxes.Insert(real_insert_index, kvp.Value);
+                                d_prev = -2;
+                            }
+                        }
+                    }
+                    insertes.Clear();
+                    insertes = null;
                 }
 
                 _tableBox._tableFixed = true;
